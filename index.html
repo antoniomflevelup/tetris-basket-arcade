@@ -420,6 +420,8 @@
     let highScore = Number(localStorage.getItem('tetris-high-score') || 0);
     let soundEnabled = localStorage.getItem('tetris-sound') !== 'off';
     let audioCtx = null;
+    let masterGain = null;
+    let audioUnlocked = false;
     let clearFlash = [];
     let dropBurst = [];
     let hypeText = { text: '', t: 0 };
@@ -477,7 +479,27 @@
     function ensureAudio() {
       try {
         audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
+        if (!masterGain && audioCtx) {
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0.95;
+          masterGain.connect(audioCtx.destination);
+        }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      } catch {}
+    }
+
+    function unlockAudio() {
+      try {
+        ensureAudio();
+        if (!audioCtx || !masterGain) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.0001;
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.02);
+        audioUnlocked = true;
       } catch {}
     }
 
@@ -493,7 +515,7 @@
         gain.gain.setValueAtTime(vol, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + len);
         osc.connect(gain);
-        gain.connect(audioCtx.destination);
+        gain.connect(masterGain || audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + len);
       } catch {}
@@ -535,7 +557,7 @@
         gain.gain.setValueAtTime(vol, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + len);
         osc.connect(gain);
-        gain.connect(audioCtx.destination);
+        gain.connect(masterGain || audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + len);
       } catch {}
@@ -555,9 +577,12 @@
       musicTimer = setTimeout(scheduleMusic, beats * beatMs);
     }
 
-    function startMusic() {
+    function startMusic(reset = false) {
       stopMusic();
+      if (reset) musicIndex = 0;
       if (!soundEnabled || paused || gameOver) return;
+      ensureAudio();
+      if (!audioCtx) return;
       scheduleMusic();
     }
 
@@ -765,9 +790,9 @@
       spawnNext();
       updateStats();
       hideOverlay();
-      audioBeep(520, .05);
-      musicIndex = 0;
-      startMusic();
+      unlockAudio();
+      audioBeep(520, .07, 'triangle', .05);
+      startMusic(true);
     }
 
     function move(dir) {
@@ -906,25 +931,37 @@
 
     document.querySelectorAll('[data-action]').forEach(btn => {
       const name = btn.dataset.action;
-      const fire = (e) => { e.preventDefault(); ensureAudio(); action(name); };
+      const fire = (e) => { e.preventDefault(); unlockAudio(); action(name); };
       btn.addEventListener('touchstart', fire, { passive: false });
       btn.addEventListener('mousedown', fire);
     });
 
-    startBtn.addEventListener('click', () => { ensureAudio(); resetGame(); });
-    pauseBtn.addEventListener('click', () => { ensureAudio(); togglePause(); });
-    holdBtn.addEventListener('click', () => { ensureAudio(); doHold(); });
+    startBtn.addEventListener('click', () => { unlockAudio(); resetGame(); });
+    pauseBtn.addEventListener('click', () => { unlockAudio(); togglePause(); });
+    holdBtn.addEventListener('click', () => { unlockAudio(); doHold(); });
     soundBtn.addEventListener('click', () => {
-      ensureAudio();
+      unlockAudio();
       soundEnabled = !soundEnabled;
       localStorage.setItem('tetris-sound', soundEnabled ? 'on' : 'off');
       if (soundEnabled) {
-        audioBeep(660, .05, 'triangle', .04);
+        audioBeep(660, .08, 'triangle', .05);
         startMusic();
       } else {
         stopMusic();
       }
       updateStats();
+    });
+
+    const unlockHandler = () => {
+      unlockAudio();
+      if (soundEnabled && !paused && !gameOver && !musicTimer) startMusic();
+    };
+    document.addEventListener('touchstart', unlockHandler, { passive: true });
+    document.addEventListener('pointerdown', unlockHandler, { passive: true });
+    document.addEventListener('click', unlockHandler, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopMusic();
+      else if (soundEnabled && !paused && !gameOver) startMusic();
     });
 
     board = makeBoard();
