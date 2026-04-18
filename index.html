@@ -544,8 +544,9 @@
     ];
     let musicTimer = null;
     let musicIndex = 0;
+    let musicPlaying = false;
 
-    function playTone(freq, len = 0.16, type = 'square', vol = 0.022) {
+    function playTone(freq, len = 0.16, type = 'square', vol = 0.035) {
       if (!soundEnabled) return;
       try {
         ensureAudio();
@@ -564,17 +565,18 @@
     }
 
     function stopMusic() {
+      musicPlaying = false;
       if (musicTimer) clearTimeout(musicTimer);
       musicTimer = null;
     }
 
     function scheduleMusic() {
-      if (!soundEnabled || paused || gameOver) return;
+      if (!musicPlaying || !soundEnabled || paused || gameOver) return;
       const [note, beats] = MUSIC_SEQUENCE[musicIndex];
-      const beatMs = 170;
-      if (note !== 'rest' && MUSIC_NOTES[note]) playTone(MUSIC_NOTES[note], Math.max(0.08, beats * 0.13), 'square', 0.018);
+      const beatMs = 185;
+      if (note !== 'rest' && MUSIC_NOTES[note]) playTone(MUSIC_NOTES[note], Math.max(0.12, beats * 0.16), 'square', 0.04);
       musicIndex = (musicIndex + 1) % MUSIC_SEQUENCE.length;
-      musicTimer = setTimeout(scheduleMusic, beats * beatMs);
+      musicTimer = setTimeout(scheduleMusic, Math.max(90, beats * beatMs));
     }
 
     function startMusic(reset = false) {
@@ -583,6 +585,7 @@
       if (!soundEnabled || paused || gameOver) return;
       ensureAudio();
       if (!audioCtx) return;
+      musicPlaying = true;
       scheduleMusic();
     }
 
