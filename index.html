@@ -573,10 +573,10 @@
     function scheduleMusic() {
       if (!musicPlaying || !soundEnabled || paused || gameOver) return;
       const [note, beats] = MUSIC_SEQUENCE[musicIndex];
-      const beatMs = 185;
-      if (note !== 'rest' && MUSIC_NOTES[note]) playTone(MUSIC_NOTES[note], Math.max(0.12, beats * 0.16), 'square', 0.04);
+      const beatMs = 320;
+      if (note !== 'rest' && MUSIC_NOTES[note]) playTone(MUSIC_NOTES[note], Math.max(0.18, beats * 0.24), 'square', 0.04);
       musicIndex = (musicIndex + 1) % MUSIC_SEQUENCE.length;
-      musicTimer = setTimeout(scheduleMusic, Math.max(90, beats * beatMs));
+      musicTimer = setTimeout(scheduleMusic, Math.max(140, beats * beatMs));
     }
 
     function startMusic(reset = false) {
